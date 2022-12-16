@@ -1,20 +1,15 @@
-import torchmetrics
-import torch
-import shutil
 import os
+import shutil
 
-# from models.resnets import Bottleneck, build_resnet
-# from models.model_head_aspp import ASPPHead
-# from models.model_head_fcn import FCNHead
-from utils import csvlogger_start
+import torch
+import torchmetrics
+
 from models.models_builder import build_backbone
+from utils import csvlogger_start
 
 
 def get_segmentation_metrics(num_classes, ignore=False):
-    """>>> C*: 关于torchmetrics的参考: https://torchmetrics.readthedocs.io/en/stable/references/modules.html#"""
     if ignore:
-        """>>> C*: 如果label里面有需要ignore的class的话, 这个class的index一般比较大,比如255, 可以设置class数目为config
-        里面的class数目+1; 但是最后在计算metric的时候把最后一个class个忽略掉;"""
         train_iou = torchmetrics.JaccardIndex(
             num_classes=num_classes + 1,
             average="none",
@@ -173,17 +168,14 @@ def get_deeplabv3plus_model():
 def get_deeplabv3plus_backbone(model):
     backbone = model.backbone
 
-    """>>> C4: 查看一下model里面的模块都有哪些; 方便之后改写加载pretrained weights的部分;"""
     backbone_list = list(backbone.children())
     # print("==>> backbone_list: ", backbone_list)
 
-    """>>> C5: segmentation使用的backbone一般都是在imagenet上pretrained; 在加载pretrained weights的时候一定要注意key是否match; """
     state_dict = torch.load("/data/SSD1/data/weights/resnet50_v1c-2cccc1ad.pth")[
         "state_dict"
     ]
     # print("==>> state_dict: ", state_dict.keys())
 
-    """>>> C6: 因为segmentation使用的backbone只是进行feature提取,没有涉及到classification, 所以要把FC这些key和value去除; """
     backbone_state_dict = {}
     fc_state_dict = {}
     for k in list(state_dict.keys()):
@@ -192,7 +184,6 @@ def get_deeplabv3plus_backbone(model):
         else:
             backbone_state_dict[k] = state_dict[k]
         del state_dict[k]
-    """>>> C7: 为了避免model加载pretrained weights错误, load_state_dict()函数里面的strict一定要设置成True; 如果出错的话,就会报错,方便debug; """
     backbone.load_state_dict(backbone_state_dict, strict=True)
 
     return backbone
@@ -205,7 +196,6 @@ def get_deeplabv3plus_heads(model):
 
 
 def init_expr_setup(config, batch_idx, current_epoch):
-    """>>> C10: 因为控制台输出的信息很多很杂,不容易查询当前代码的配置, 所以在每个epoch开始的时候把程序调用的配置路径给打印出来方便确定是哪一个实验;"""
     if config["TRAIN"]["LOGGER"] == "csv":
         if current_epoch <= 2:
             if batch_idx == 0:
@@ -219,7 +209,6 @@ def init_expr_setup(config, batch_idx, current_epoch):
                     )
                 )
 
-    """>>> C11: 这个是在使用wandb之前,在程序最初的阶段,把model的代码和实验配置复制到results folder里面; """
     if current_epoch == 1 and batch_idx == 0 and config["TRAIN"]["LOGGER"] == "csv":
         csv_logger_folder, config = csvlogger_start(config)
 

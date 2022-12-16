@@ -1,4 +1,4 @@
-import argparse
+
 import os
 import warnings
 
@@ -28,13 +28,8 @@ plt.style.use("ggplot")
 
 warnings.filterwarnings("ignore")
 
-from configs.config_v0 import (
-    DataConfig,
-    NetConfig,
-    TestingConfig,
-    TrainingConfig,
-    ValidationConfig,
-)
+from configs.config_v0 import (DataConfig, NetConfig, TestingConfig,
+                               TrainingConfig, ValidationConfig)
 
 # def parse_args():
 #     parser = argparse.ArgumentParser(description="Train a segmentor")
@@ -185,7 +180,6 @@ if __name__ == "__main__":
             # plugins=DDPPlugin(find_unused_parameters=False),
             check_val_every_n_epoch=ValidationConfig.val_interval,
             auto_scale_batch_size="binsearch",
-            # """>>> C: mmlab如果给出了sampler可以选择使用mmlab的sampler,这里replace_sampler_ddp需要设置成False; """
             replace_sampler_ddp=False,
             auto_lr_find=True,
         )
@@ -213,7 +207,6 @@ if __name__ == "__main__":
             # plugins=DDPPlugin(find_unused_parameters=False),
             check_val_every_n_epoch=ValidationConfig.val_interval,
             auto_scale_batch_size="binsearch",
-            # """>>> C: mmlab如果给出了sampler可以选择使用mmlab的sampler,这里replace_sampler_ddp需要设置成False; """
             # replace_sampler_ddp=False,
         )
 

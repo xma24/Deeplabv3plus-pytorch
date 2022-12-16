@@ -1,18 +1,10 @@
 import matplotlib
-import numpy as np
-import torch
-from matplotlib import cm
-from PIL import Image
-from torchvision import transforms
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 plt.style.use("ggplot")
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 EPS = 1e-8
 

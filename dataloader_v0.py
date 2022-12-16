@@ -1,28 +1,7 @@
-import os
-import pickle
-import random
-from functools import partial
 
-import albumentations as A
-import numpy as np
-import torch
-import torchmetrics
-import torchvision.transforms as transforms
-import torchvision.transforms as tf
-import torchvision.transforms.functional as F
-import yaml
-from albumentations.pytorch import ToTensorV2
-from PIL import Image, ImagePalette
-from timm.data.auto_augment import rand_augment_transform
-from mmcv.parallel import collate
 
-from configs.config_v0 import (
-    DataConfig,
-    NetConfig,
-    TestingConfig,
-    TrainingConfig,
-    ValidationConfig,
-)
+from configs.config_v0 import (DataConfig, TestingConfig, TrainingConfig,
+                               ValidationConfig)
 
 
 class ExtraDatasetConfig:
@@ -124,7 +103,7 @@ class UniDataloader:
 
     def get_dataloader(self, split, num_gpus):
         print("==>> split: ", split)
-        from datasets.datasets_builder import build_dataset, build_dataloader
+        from datasets.datasets_builder import build_dataloader, build_dataset
 
         data_config = {}
 
