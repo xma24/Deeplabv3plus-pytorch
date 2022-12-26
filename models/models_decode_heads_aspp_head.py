@@ -94,7 +94,6 @@ class ASPPHead(BaseDecodeHead):
             act_cfg=self.act_cfg,
         )
 
-        """>>> C: bottleneck的意思就是把feature拼接之后通过一个conv计算融合之后的feature; """
         self.bottleneck = ConvModule(
             (len(dilations) + 1) * self.channels,
             self.channels,
@@ -117,7 +116,6 @@ class ASPPHead(BaseDecodeHead):
                 H, W) which is feature map for last layer of decoder head.
         """
 
-        """>>> C: ASPP得到的feature最后还是要和输入的image上采样之后进行拼接的; """
         x = self._transform_inputs(inputs)
         aspp_outs = [
             resize(

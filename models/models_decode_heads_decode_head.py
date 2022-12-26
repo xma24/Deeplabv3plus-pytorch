@@ -93,7 +93,6 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         self.ignore_index = ignore_index
         self.align_corners = align_corners
 
-        """>>> C: 如果model没有指定out_channel默认的out_channel就是class的数目; """
         if out_channels is None:
             if num_classes == 2:
                 warnings.warn(
@@ -113,7 +112,6 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
                 f"and num_classes={num_classes}"
             )
 
-        """>>> C: 如果没有指定threshoold的话,默认值是0.3; """
         if out_channels == 1 and threshold is None:
             threshold = 0.3
             warnings.warn("threshold is not defined for binary, and defaults" "to 0.3")
@@ -121,7 +119,6 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         self.out_channels = out_channels
         self.threshold = threshold
 
-        """>>> C: mmlab的特点就是把model和loss混合在一起, forward可以选择直接计算loss进行输出; """
         if isinstance(loss_decode, dict):
             self.loss_decode = build_loss(loss_decode)
         elif isinstance(loss_decode, (list, tuple)):
@@ -139,7 +136,6 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         else:
             self.sampler = None
 
-        """>>> C: 最后segmentation的实现是通过pixel-wise conv来实现的; """
         self.conv_seg = nn.Conv2d(channels, self.out_channels, kernel_size=1)
 
         if dropout_ratio > 0:
@@ -247,7 +243,6 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
             dict[str, Tensor]: a dictionary of loss components
         """
 
-        """>>> C: forward函数需要自己去实现, 实现之后可以计算feature或者output, 之后计算loss; """
         seg_logits = self(inputs)
         losses = self.losses(seg_logits, gt_semantic_seg)
         return losses

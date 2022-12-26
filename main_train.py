@@ -1,4 +1,3 @@
-
 import os
 import warnings
 
@@ -9,13 +8,13 @@ import pytorch_lightning as pl
 import torch
 import torch.backends.cudnn as cudnn
 import torch.onnx
+import wandb
 from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import QuantizationAwareTraining
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 from pytorch_lightning.plugins import DDPPlugin
 from pytorch_lightning.strategies import DDPStrategy
 from rich import print
-from termcolor import colored, cprint
 
 from expr_setting import ExprSetting
 
@@ -28,17 +27,14 @@ plt.style.use("ggplot")
 
 warnings.filterwarnings("ignore")
 
-from configs.config_v0 import (DataConfig, NetConfig, TestingConfig,
-                               TrainingConfig, ValidationConfig)
-
-# def parse_args():
-#     parser = argparse.ArgumentParser(description="Train a segmentor")
-#     parser.add_argument(
-#         "--config", default="config_default.yaml", help="train config file path"
-#     )
-#     args = parser.parse_args()
-#     return args
-
+from configs.config_v0 import (
+    DataConfig,
+    DeeplabV3PlusConfig,
+    NetConfig,
+    TestingConfig,
+    TrainingConfig,
+    ValidationConfig,
+)
 
 if __name__ == "__main__":
 
@@ -75,61 +71,52 @@ if __name__ == "__main__":
     elif TrainingConfig.logger_name == "csv":
         own_logger = CSVLogger(DataConfig.logger_root)
     elif TrainingConfig.logger_name == "wandb":
-        own_logger = WandbLogger(project=TrainingConfig.wandb_name)
+        own_logger = WandbLogger(
+            project=TrainingConfig.wandb_name, settings=wandb.Settings(code_dir=".")
+        )
     else:
         own_logger = CSVLogger(DataConfig.logger_root)
 
     print("num of gpus: {}".format(num_gpus))
 
-    train_dataloader = dataloader_class.get_train_dataloader(num_gpus=num_gpus)
-    print("train_dataloader: {}".format(len(train_dataloader)))
-
-    num_train_batches = len(train_dataloader) // num_gpus
-    if (len(train_dataloader) // num_gpus) // 6 >= 10:
-        num_train_batches = 10
-    else:
-        num_train_batches = int((len(train_dataloader) // num_gpus) // 6) - 1
-
-    # """
-    #     - Get calibration dataloder
-    # """
-    # cal_dataloader = dataloader_class.get_cal_dataloader()
-    # print("cal_dataloader: {}".format(len(cal_dataloader)))
-    # config["cal_dataloader"] = cal_dataloader
-
-    # """
-    #     - Get sample data
-    # """
-    # single_batch = next(iter(train_dataloader))
-    # config["sample_data"] = single_batch
-    # # config["sample_data"] = single_batch[0]
-    # # config["sample_labels"] = single_batch[1]
-    # # print("sample data: {}, sample lables: {}".format(config["sample_data"].shape, config["sample_labels"].shape))
-
-    val_dataloader = dataloader_class.get_val_dataloader(num_gpus=num_gpus)
-    print("val_dataloader: {}".format(len(val_dataloader)))
-
-    # config["val_dataloader"] = val_dataloader
-
-    num_val_batches = len(val_dataloader) // num_gpus
-    if len(val_dataloader) % num_gpus == 0:
-        num_val_batches = (len(val_dataloader) // num_gpus) - 1
-    else:
-        num_val_batches = len(val_dataloader) // num_gpus
-
     model = model_class(TrainingConfig.batch_size, NetConfig.lr, own_logger)
-    # model = model_class(own_logger)
 
-    # print(">>> config: {}".format(config))
+    if TrainingConfig.pretrained_weights:
+        checkpoint = torch.load(TrainingConfig.pretrained_weights_path)
+        print("init keys of checkpoint:{}".format(checkpoint.keys()))
 
-    if TrainingConfig.resume != "none":
-        model = model_class.load_from_checkpoint(
-            TrainingConfig.resume, logger=own_logger
-        )
-        print(">>> Using checkpoint from pretrained models")
-        # model = model.load_state_dict(torch.load(config["TRAIN"]["RESUME"]))
+        state_dict = checkpoint["state_dict"]
+        print("init keys :{}".format(state_dict.keys()))
 
-    """
+        updated_state_dict = {}
+        for k in list(state_dict.keys()):
+            updated_state_dict["model." + k] = state_dict[k]
+        print("==>> updated_state_dict: ", updated_state_dict.keys())
+
+        model.load_state_dict(state_dict, strict=True)
+
+        TrainingConfig.max_epochs = TrainingConfig.pretrained_weights_max_epoch
+
+        print("\n Using pretrained weights ... \n")
+
+    if DeeplabV3PlusConfig.pretrained_cls_weights:
+        state_dict = torch.load(DeeplabV3PlusConfig.pretrained_cls_weights_path)[
+            "state_dict"
+        ]
+
+        backbone_state_dict = {}
+        fc_state_dict = {}
+        for k in list(state_dict.keys()):
+            if k.startswith("fc."):
+                fc_state_dict[k[len("fc.") :]] = state_dict[k]
+            else:
+                backbone_state_dict[k] = state_dict[k]
+            del state_dict[k]
+        model.backbone.load_state_dict(backbone_state_dict, strict=True)
+
+        print("\n Using pretrained CLS BACKBONE weights ... \n")
+
+    """>>>
         - The setting of pytorch lightning Trainer:
             (https://github.com/Lightning-AI/lightning/blob/master/src/pytorch_lightning/trainer/trainer.py)
     """
@@ -161,13 +148,15 @@ if __name__ == "__main__":
             # gpus=torch.cuda.device_count(),  ### let the code to detect the number of gpus to use
             num_nodes=TrainingConfig.num_nodes,
             precision=TrainingConfig.precision,
+            # accelerator="gpu",
+            # strategy=DDPStrategy(find_unused_parameters=True),
             # accelerator=TrainingConfig.accelerator,
             # strategy=DDPStrategy(find_unused_parameters=True),
             # (strategy="ddp", accelerator="gpu", devices=4);(strategy=DDPStrategy(find_unused_parameters=False), accelerator="gpu", devices=4);
             # (strategy="ddp_spawn", accelerator="auto", devices=4); (strategy="deepspeed", accelerator="gpu", devices="auto"); (strategy="ddp", accelerator="cpu", devices=3);
             # (strategy="ddp_spawn", accelerator="tpu", devices=8); (accelerator="ipu", devices=8);
-            strategy="ddp_spawn",
-            accelerator="auto",
+            # strategy="ddp_spawn",
+            # accelerator="auto",
             # profiler="pytorch",  # "simple", "advanced","pytorch"
             logger=own_logger,
             callbacks=[lr_logger, model_checkpoint, early_stop],
@@ -180,11 +169,40 @@ if __name__ == "__main__":
             # plugins=DDPPlugin(find_unused_parameters=False),
             check_val_every_n_epoch=ValidationConfig.val_interval,
             auto_scale_batch_size="binsearch",
-            replace_sampler_ddp=False,
+            # replace_sampler_ddp=False,
             auto_lr_find=True,
         )
+    elif (not TrainingConfig.lr_find) and TrainingConfig.pl_resume:
+        print(
+            "using GPUs to do experiments; Not using lr_find; Using resume setting... "
+        )
+        trainer = pl.Trainer(
+            devices=TrainingConfig.num_gpus,
+            # gpus=torch.cuda.device_count(),  ### let the code to detect the number of gpus to use
+            num_nodes=TrainingConfig.num_nodes,
+            precision=TrainingConfig.precision,
+            accelerator=TrainingConfig.accelerator,
+            strategy=DDPStrategy(find_unused_parameters=True),
+            # (strategy="ddp", accelerator="gpu", devices=4);(strategy=DDPStrategy(find_unused_parameters=False), accelerator="gpu", devices=4);
+            # (strategy="ddp_spawn", accelerator="auto", devices=4); (strategy="deepspeed", accelerator="gpu", devices="auto"); (strategy="ddp", accelerator="cpu", devices=3);
+            # (strategy="ddp_spawn", accelerator="tpu", devices=8); (accelerator="ipu", devices=8);
+            # profiler="pytorch",  # "simple", "advanced","pytorch"
+            logger=own_logger,
+            callbacks=[lr_logger, model_checkpoint, early_stop],
+            log_every_n_steps=1,
+            # track_grad_norm=1,
+            progress_bar_refresh_rate=TrainingConfig.progress_bar_refresh_rate,
+            max_epochs=TrainingConfig.pl_resume_max_epoch,
+            resume_from_checkpoint=TrainingConfig.pl_resume_path,
+            # sync_batchnorm=True if num_gpus > 1 else False,
+            # plugins=DDPPlugin(find_unused_parameters=False),
+            check_val_every_n_epoch=ValidationConfig.val_interval,
+            auto_scale_batch_size="binsearch",
+            # replace_sampler_ddp=False,
+        )
     else:
-        print("using GPUs to do experiments ... ")
+        print("using GPUs to do experiments; Not using lr_find; ")
+
         trainer = pl.Trainer(
             devices=TrainingConfig.num_gpus,
             # gpus=torch.cuda.device_count(),  ### let the code to detect the number of gpus to use
@@ -202,7 +220,7 @@ if __name__ == "__main__":
             # track_grad_norm=1,
             progress_bar_refresh_rate=TrainingConfig.progress_bar_refresh_rate,
             max_epochs=TrainingConfig.max_epochs,
-            # resume_from_checkpoint=config["TRAIN"]["CKPT_PATH"],
+            # resume_from_checkpoint="/home/xma24/vscode/openmmlab_projects/openmmlab_projects/DeepLabV3Plus-Pytorch-1205-2022-V5/pytorch_segmentation/36z9a2cl/checkpoints/epoch=90-val_loss=0.14-user_metric=0.73.ckpt",
             # sync_batchnorm=True if num_gpus > 1 else False,
             # plugins=DDPPlugin(find_unused_parameters=False),
             check_val_every_n_epoch=ValidationConfig.val_interval,
@@ -210,20 +228,4 @@ if __name__ == "__main__":
             # replace_sampler_ddp=False,
         )
 
-    # print("==>> model.hparams: ", model.hparams)
-
-    # # lr_Finder = trainer.tuner.lr_find(model)
-    # lr_Finder = trainer.lr_find(model, train_dataloader)
-
-    # fig = lr_Finder.plot(suggest=True)
-    # plt.savefig("lr_finder.png")
-
-    # model.hparams.learning_rate = lr_Finder.suggestion()
-
-    # trainer.fit(model, train_dataloaders=train_dataloader)
-
-    # trainer.test(model, dataloaders=val_dataloader)
-    trainer.fit(
-        model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader
-    )
-    # trainer.test(model, dataloaders=val_dataloader)
+    trainer.fit(model)

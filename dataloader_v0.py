@@ -1,7 +1,28 @@
+import os
+import pickle
+import random
+from functools import partial
 
+import albumentations as A
+import numpy as np
+import torch
+import torchmetrics
+import torchvision.transforms as transforms
+import torchvision.transforms as tf
+import torchvision.transforms.functional as F
+import yaml
+from albumentations.pytorch import ToTensorV2
+from PIL import Image, ImagePalette
+from timm.data.auto_augment import rand_augment_transform
+from mmcv.parallel import collate
 
-from configs.config_v0 import (DataConfig, TestingConfig, TrainingConfig,
-                               ValidationConfig)
+from configs.config_v0 import (
+    DataConfig,
+    NetConfig,
+    TestingConfig,
+    TrainingConfig,
+    ValidationConfig,
+)
 
 
 class ExtraDatasetConfig:
@@ -43,6 +64,7 @@ class ExtraDatasetConfig:
         dict(
             type="MultiScaleFlipAug",
             img_scale=(2048, 1024),
+            # img_scale=(1024, 512),
             # img_ratios=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75],
             flip=False,
             transforms=[
@@ -102,8 +124,8 @@ class UniDataloader:
         super(UniDataloader, self).__init__()
 
     def get_dataloader(self, split, num_gpus):
-        print("==>> split: ", split)
-        from datasets.datasets_builder import build_dataloader, build_dataset
+        # print("==>> split: ", split)
+        from datasets.datasets_builder import build_dataset, build_dataloader
 
         data_config = {}
 
@@ -126,7 +148,7 @@ class UniDataloader:
             print("\n The split is not valid.\n")
 
         dataset = build_dataset(data_config)
-        print("==>> dataset: ", len(dataset))
+        # print("==>> dataset: ", len(dataset))
 
         dataloader = build_dataloader(
             dataset,
@@ -178,60 +200,21 @@ if __name__ == "__main__":
 
     dataloader_class = UniDataloader()
     train_dataloader = dataloader_class.get_train_dataloader(num_gpus=4)
-    """>>>
-    print("train_dataloder: {}".format(len(train_dataloader)))
-    # train_dataloder: 185
-    """
-
     val_dataloader = dataloader_class.get_val_dataloader(num_gpus=4)
-    """>>>
-    print("val_dataloader: {}".format(len(val_dataloader)))
-    # val_dataloader: 32
-    """
-
     test_dataloader = dataloader_class.get_test_dataloader(num_gpus=4)
-    """>>>
-    print("test_dataloader: {}".format(len(test_dataloader)))
-    # test_dataloader: 32
-    """
-
-    print("\n Checking Train Dataloader \n ")
-    for batch_idx, data_dict in enumerate(train_dataloader):
-        """>>>
-        print("==>> data_dict: ", data_dict.keys())
-        # ==>> data_dict:  dict_keys(['img_metas', 'img', 'gt_semantic_seg'])
-        """
-
-        image, mask = data_dict["img"]._data[0], data_dict["gt_semantic_seg"]._data[0]
-
-        """>>>
-        
-        """
-        print("==>> mask.shape: ", mask.shape)
-        print("==>> image.shape: ", image.shape)
-        # ==>> mask.shape:  torch.Size([8, 1, 512, 1024])
-        # ==>> image.shape:  torch.Size([8, 3, 512, 1024])
-
-        # break
 
     print("\n Checking Val Dataloader \n")
     for batch_idx, data_dict in enumerate(val_dataloader):
 
-        """>>>
-        print("==>> data_dict: ", data_dict.keys())
-        # ==>> data_dict:  dict_keys(['img_metas', 'img', 'gt_semantic_seg'])
-        """
+        images, masks = data_dict["img"], data_dict["gt_semantic_seg"]
 
-        image, mask = data_dict["img"][0], data_dict["gt_semantic_seg"][0]
-        """>>>
-        
-        """
-        print("==>> mask.shape: ", mask.shape)
-        print("==>> image.shape: ", image.shape)
-        # print("==>> image: ", image)
-        # ==>> mask.shape:  torch.Size([8, 1, 1024, 2048])
-        # ==>> image.shape:  torch.Size([8, 3, 1024, 2048])
+        for image_idx in range(len(images)):
+            sub_image = images[image_idx]
+            print("==>> sub_image.shape: ", sub_image.shape)
 
-        # import sys
+        for mask_idx in range(len(masks)):
+            sub_mask = masks[mask_idx]
+            print("==>> sub_mask.shape: ", sub_mask.shape)
 
-        # sys.exit()
+        break
+

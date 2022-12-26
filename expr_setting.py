@@ -1,10 +1,15 @@
-
-import sys
-
+import yaml
 from termcolor import colored, cprint
+import sys
+from utils import dotdict
 
-from configs.config_v0 import (DataConfig, NetConfig, TestingConfig,
-                               TrainingConfig, ValidationConfig)
+from configs.config_v0 import (
+    DataConfig,
+    NetConfig,
+    TrainingConfig,
+    ValidationConfig,
+    TestingConfig,
+)
 
 
 class ExprSetting(object):
@@ -22,8 +27,7 @@ class ExprSetting(object):
         self.early_stop = self.earlystop_setting()
 
     def checkpoint_setting(self):
-        from pytorch_lightning.callbacks import (LearningRateMonitor,
-                                                 ModelCheckpoint)
+        from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 
         lr_logger = LearningRateMonitor(logging_interval="epoch")
 

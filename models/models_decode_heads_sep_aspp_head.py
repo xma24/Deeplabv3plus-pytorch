@@ -59,7 +59,6 @@ class DepthwiseSeparableASPPHead(ASPPHead):
             act_cfg=self.act_cfg,
         )
 
-        """>>> C: 如果c1_in_channels给出的话,那么就多加一层bottleneck; """
         if c1_in_channels > 0:
             self.c1_bottleneck = ConvModule(
                 c1_in_channels,
@@ -72,7 +71,6 @@ class DepthwiseSeparableASPPHead(ASPPHead):
         else:
             self.c1_bottleneck = None
 
-        """>>> C: 可分离的bottleneck是必须的; """
         self.sep_bottleneck = nn.Sequential(
             DepthwiseSeparableConvModule(
                 self.channels + c1_channels,
@@ -95,9 +93,6 @@ class DepthwiseSeparableASPPHead(ASPPHead):
     def forward(self, inputs):
         """Forward function."""
         x = self._transform_inputs(inputs)
-
-        """>>> C: 这里的第一项就是保留了Low-level feature, 这是deeplabv3plus和deeplabv3不同的地方; 
-                ASPP里面也有image_pool但是那个是在high-level feature上做的; """
         aspp_outs = [
             resize(
                 self.image_pool(x),
@@ -111,7 +106,6 @@ class DepthwiseSeparableASPPHead(ASPPHead):
 
         output = self.bottleneck(aspp_outs)
 
-        """>>> C: c1_bottleneck并不是必需的,但是如果有的话应该可以丰富feature的extraction; """
         if self.c1_bottleneck is not None:
             c1_output = self.c1_bottleneck(inputs[0])
             output = resize(
@@ -120,7 +114,7 @@ class DepthwiseSeparableASPPHead(ASPPHead):
                 mode="bilinear",
                 align_corners=self.align_corners,
             )
-            """>>> C: 这里地方类似skip connection,同时也保证如果没有bottleneck的话, 可分离bottleneck也可以使用; """
+
             output = torch.cat([output, c1_output], dim=1)
 
         output = self.sep_bottleneck(output)
