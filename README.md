@@ -1,7 +1,4 @@
-# deeplabv3plus-torch
-The implementation of DeeplabV3Plus with Pytorch
-
----
+# The implementation of DeeplabV3Plus with Pytorch
 
 The training process of deeplabv3+ with resnet101 as backbone on Cityscapes dataset. The mIoU on validation set of Cityscape is 0.7935.
 
